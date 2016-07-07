@@ -1,0 +1,6 @@
+#!/bin/sh
+
+echo "Encoding starting at frame $1...to $2"
+ffmpeg -start_number $1 -r 60 -i ./tmp/frame-%d.png -vcodec libx264 -preset slow -threads 0 $2
+
+

@@ -1,0 +1,206 @@
+<!doctype html>
+<html>
+	<head>
+		<title>holoGrammify</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		
+			
+		<script src="vendor/three.js/Three.js"></script>
+		<script src="vendor/three.js/Detector.js"></script>
+
+		<script src="vendor/threex/THREEx.screenshot.js"></script>
+		<script src="vendor/threex/THREEx.FullScreen.js"></script>
+		<script src="vendor/threex/THREEx.WindowResize.js"></script>
+		<script src="vendor/three.js/TrackballControls.js"></script>
+
+		
+		<link  href="css/main.css" rel="stylesheet"/>
+	</head>
+<body>
+	<!-- three.js container -->
+    	<div id="container"></div>
+	<!-- info on screen display -->
+	<div id="info">
+		<div class="top">
+
+		</div>
+		<div class="bottom" id="inlineDoc" >
+
+		</div> 
+	</div> 
+	<script src="STLLoader.js"></script>
+	<script src="/socket.io/socket.io.js"></script>
+	<script type="text/javascript">
+		var stats, scene, renderer, composer;
+		var camera, cameraControls;
+		// connect websocket for frame export yo
+		var socket = io.connect('http://localhost:3000');
+		var frame = 0;
+		// 4 meshes, 1 for each angle (front, left, right, back)
+		var asciiSTLToLoad = 'models/stl/ascii/LarryRot.stl';
+		var meshScale = .25;
+		var distFromCenter = .9; 
+		var meshFront = new THREE.Object3D();
+		var meshLeft= new THREE.Object3D();
+		var meshRight= new THREE.Object3D();
+		var meshBack= new THREE.Object3D();
+
+		if( !init() )	animate();
+
+
+		// init the scene
+		function init(){
+
+			if( Detector.webgl ){
+				renderer = new THREE.WebGLRenderer({
+					antialias		: true,	// to get smoother output
+					preserveDrawingBuffer	: true	// to allow screenshot
+				});
+				renderer.setClearColor( 0x000000 );
+			}else{
+				Detector.addGetWebGLMessage();
+				return true;
+			}
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			document.getElementById('container').appendChild(renderer.domElement);
+
+
+			// create a scene
+			scene = new THREE.Scene();
+
+			// put a camera in the scene
+			var cameraH	= 3;
+			var cameraW	= cameraH / window.innerHeight * window.innerWidth;
+			camera	= new THREE.OrthographicCamera( -cameraW/2, +cameraW/2, cameraH/2, -cameraH/2, -10000, 10000 );
+			camera.position.set(0, 0, 5);
+			scene.add(camera);
+
+			// create a camera contol
+			//cameraControls	= new THREE.TrackballControls( camera )
+
+			// transparently support window resize
+			THREEx.WindowResize.bind(renderer, camera);
+			// allow 'p' to make screenshot
+			THREEx.Screenshot.bindKey(renderer);
+			// allow 'f' to go fullscreen where this feature is supported
+			if( THREEx.FullScreen.available() ){
+				THREEx.FullScreen.bindKey();		
+				document.getElementById('inlineDoc').innerHTML	+= "- <i>f</i> for fullscreen";
+			}
+
+			// here you add your objects
+			// - you will most likely replace this part by your own
+			var light	= new THREE.AmbientLight( Math.random() * 0xffffff );
+			scene.add( light );
+			var light	= new THREE.DirectionalLight( Math.random() * 0xffffff );
+			light.position.set( Math.random(), Math.random(), Math.random() ).normalize();
+			scene.add( light );
+			var light	= new THREE.DirectionalLight( Math.random() * 0xffffff );
+			light.position.set( Math.random(), Math.random(), Math.random() ).normalize();
+			scene.add( light );
+			var light	= new THREE.PointLight( Math.random() * 0xffffff );
+			light.position.set( Math.random()-0.5, Math.random()-0.5, Math.random()-0.5 )
+						.normalize().multiplyScalar(1.2);
+			scene.add( light );
+			var light	= new THREE.PointLight( Math.random() * 0xffffff );
+			light.position.set( Math.random()-0.5, Math.random()-0.5, Math.random()-0.5 )
+						.normalize().multiplyScalar(1.2);
+			scene.add( light );
+
+			
+			// var geometry	= new THREE.SphereGeometry( 1, 16, 8 );
+			// var material	= new THREE.MeshNormalMaterial();
+			// var mesh	= new THREE.Mesh( geometry, material ); 
+			// scene.add( mesh );
+			// prepare STL loader and load the model
+			var oStlLoader = new THREE.STLLoader();
+			oStlLoader.load(asciiSTLToLoad, function(geometry) {
+
+			  var material = new THREE.MeshNormalMaterial();
+			  
+			  //Object Front View
+			  meshFront = new THREE.Mesh(geometry, material);
+			  meshFront.rotation.set( 0, 0, Math.PI);
+			  meshFront.position.set(0, distFromCenter, 0);
+			  meshFront.scale.set(meshScale, meshScale, meshScale);
+
+			  //Object Left View
+			  meshLeft = new THREE.Mesh(geometry, material);
+			  meshLeft.rotation.set( -Math.PI/2, 0, -Math.PI/2);
+			  meshLeft.position.set(-distFromCenter, 0, 0);
+			  meshLeft.scale.set(meshScale, meshScale, meshScale);
+
+			  //Object Right View
+			  meshRight = new THREE.Mesh(geometry, material);
+			  meshRight.rotation.set( -Math.PI/2, 0, Math.PI/2);
+			  meshRight.position.set(distFromCenter, 0, 0);
+			  meshRight.scale.set(meshScale, meshScale, meshScale);
+
+			  //Object Back View
+			  meshBack = new THREE.Mesh(geometry, material);
+			  meshBack.rotation.set( 0, Math.PI, 0);
+			  meshBack.position.set(0, -distFromCenter, 0);
+			  meshBack.scale.set(meshScale, meshScale, meshScale);
+
+			  //Object Right View
+			  scene.add(meshFront);
+			  scene.add(meshLeft);
+			  scene.add(meshRight);
+			  scene.add(meshBack);
+			  
+
+
+
+
+			  console.log('loaded stl');
+			});
+
+		}
+
+
+		// animation loop
+		function animate() {
+
+			// loop on request animation loop
+			// - it has to be at the begining of the function
+			// - see details at http://my.opera.com/emoller/blog/2011/12/20/requestanimationframe-for-smart-er-animating
+			 meshFront.rotation.y += 0.01;
+			 meshRight.rotation.x += 0.01;
+			 meshLeft.rotation.x -= 0.01;
+			 meshBack.rotation.y -= 0.01;
+			requestAnimationFrame( animate );
+
+			// do the render
+			//scene.mesh.rotation.x += 0.1;
+			render();
+
+		}
+
+		// render the scene
+		function render() {
+			// variable which is increase by Math.PI every seconds - usefull for animation
+			//var PIseconds	= Date.now() * Math.PI;
+
+			// update camera controls
+			//cameraControls.update();
+
+			// animation of all objects
+			// scene.traverse(function(object3d, i){
+			// 	if( object3d instanceof THREE.Mesh === false )	return
+				
+			// 	//object3d.rotation.y = PIseconds*0.0002 * (i % 2 ? 1 : -1);
+			// })
+
+			// actually render the scene
+			renderer.render( scene, camera );
+			if(meshFront.rotation.y < Math.PI * 2){
+				    socket.emit('render-frame', {
+                        frame: frame++,
+                        file: document.querySelector('canvas').toDataURL()
+                    });
+			}
+		}
+	</script>
+</body>
+</html>
